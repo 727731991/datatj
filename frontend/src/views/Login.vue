@@ -67,9 +67,12 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { authAPI } from '@/utils/api'
 import { setToken, setUser } from '@/utils/auth'
+
+const router = useRouter()
 
 const form = reactive({
   username: '',
@@ -103,22 +106,22 @@ const handleLogin = async () => {
     ElMessage.warning('请输入用户名和密码')
     return
   }
-  
+
   loading.value = true
-  
+
   try {
     const params = new URLSearchParams()
     params.append('username', form.username)
     params.append('password', form.password)
-    
+
     const response = await authAPI.login(params)
     const { access_token, user } = response.data
-    
+
     setToken(access_token)
     setUser(user)
-    
+
     ElMessage.success('登录成功')
-    window.location.href = '/'
+    router.push('/')
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '登录失败')
   } finally {

@@ -32,6 +32,83 @@ async def get_data(
     records = query.offset(skip).limit(limit).all()
     return records
 
+@router.get("/categories")
+async def get_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    categories = db.query(DataRecord.category).distinct().all()
+    return [cat[0] for cat in categories]
+
+@router.get("/summary")
+async def get_summary(
+    category: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    query = db.query(DataRecord)
+    if category:
+        query = query.filter(DataRecord.category == category)
+    if start_date:
+        query = query.filter(DataRecord.date >= start_date)
+    if end_date:
+        query = query.filter(DataRecord.date <= end_date)
+
+    records = query.all()
+    total_count = len(records)
+    total_value = sum(float(r.value) for r in records)
+    avg_value = total_value / total_count if total_count > 0 else 0
+
+    return {
+        "total_count": total_count,
+        "total_value": round(total_value, 2),
+        "avg_value": round(avg_value, 2),
+        "category": category
+    }
+
+@router.get("/export")
+async def export_data(
+    category: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    query = db.query(DataRecord)
+    if category:
+        query = query.filter(DataRecord.category == category)
+    if start_date:
+        query = query.filter(DataRecord.date >= start_date)
+    if end_date:
+        query = query.filter(DataRecord.date <= end_date)
+
+    records = query.all()
+    data = [{
+        'id': r.id,
+        'category': r.category,
+        'title': r.title,
+        'value': float(r.value),
+        'unit': r.unit,
+        'date': r.date.isoformat(),
+        'remark': r.remark,
+        'created_at': r.created_at.isoformat() if r.created_at else None
+    } for r in records]
+
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Data')
+    output.seek(0)
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=data_export.xlsx"}
+    )
+
 @router.get("/{record_id}", response_model=DataRecordResponse)
 async def get_record(
     record_id: int,
@@ -144,80 +221,3 @@ async def import_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error importing data: {str(e)}"
         )
-
-@router.get("/export")
-async def export_data(
-    category: Optional[str] = None,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    query = db.query(DataRecord)
-    if category:
-        query = query.filter(DataRecord.category == category)
-    if start_date:
-        query = query.filter(DataRecord.date >= start_date)
-    if end_date:
-        query = query.filter(DataRecord.date <= end_date)
-    
-    records = query.all()
-    data = [{
-        'id': r.id,
-        'category': r.category,
-        'title': r.title,
-        'value': float(r.value),
-        'unit': r.unit,
-        'date': r.date.isoformat(),
-        'remark': r.remark,
-        'created_at': r.created_at.isoformat() if r.created_at else None
-    } for r in records]
-    
-    df = pd.DataFrame(data)
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Data')
-    output.seek(0)
-    
-    from fastapi.responses import StreamingResponse
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=data_export.xlsx"}
-    )
-
-@router.get("/categories")
-async def get_categories(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    categories = db.query(DataRecord.category).distinct().all()
-    return [cat[0] for cat in categories]
-
-@router.get("/summary")
-async def get_summary(
-    category: Optional[str] = None,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    query = db.query(DataRecord)
-    if category:
-        query = query.filter(DataRecord.category == category)
-    if start_date:
-        query = query.filter(DataRecord.date >= start_date)
-    if end_date:
-        query = query.filter(DataRecord.date <= end_date)
-    
-    records = query.all()
-    total_count = len(records)
-    total_value = sum(float(r.value) for r in records)
-    avg_value = total_value / total_count if total_count > 0 else 0
-    
-    return {
-        "total_count": total_count,
-        "total_value": round(total_value, 2),
-        "avg_value": round(avg_value, 2),
-        "category": category
-    }

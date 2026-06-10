@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import date, datetime
 from typing import Optional, List
 
@@ -16,9 +16,7 @@ class UserUpdate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: datetime
-    
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DataRecordBase(BaseModel):
     category: str
@@ -38,9 +36,7 @@ class DataRecordResponse(DataRecordBase):
     id: int
     created_by: Optional[int]
     created_at: datetime
-    
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ReportTemplateBase(BaseModel):
     name: str
@@ -52,9 +48,7 @@ class ReportTemplateCreate(ReportTemplateBase):
 class ReportTemplateResponse(ReportTemplateBase):
     id: int
     created_at: datetime
-    
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ReportRequest(BaseModel):
     template_id: Optional[int] = None
